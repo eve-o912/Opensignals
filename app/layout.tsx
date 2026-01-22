@@ -45,8 +45,3 @@ export default function RootLayout({
     </html>
   )
 }
-        </WalletProvider>
-      </body>
-    </html>
-  )
-}
