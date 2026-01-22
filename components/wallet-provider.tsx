@@ -1,4 +1,28 @@
-// Wallet connection with proper error handling
+"use client"
+
+import { createContext, useContext, useState, ReactNode, useEffect } from "react"
+
+interface Account {
+  address: string
+  balance: string
+  chainId: number
+  connected: boolean
+}
+
+interface WalletContextType {
+  account: Account | null
+  isConnecting: boolean
+  connect: () => Promise<void>
+  disconnect: () => void
+}
+
+const WalletContext = createContext<WalletContextType | undefined>(undefined)
+
+export function WalletProvider({ children }: { children: ReactNode }) {
+  const [account, setAccount] = useState<Account | null>(null)
+  const [isConnecting, setIsConnecting] = useState(false)
+
+  // Wallet connection with proper error handling
   const connect = async () => {
     setIsConnecting(true)
     try {
@@ -39,3 +63,56 @@
       setIsConnecting(false)
     }
   }
+
+  const disconnect = () => {
+    setAccount(null)
+  }
+
+  // Listen for account changes
+  useEffect(() => {
+    if (typeof window !== "undefined" && typeof window.ethereum !== "undefined") {
+      const handleAccountsChanged = (accounts: string[]) => {
+        if (accounts.length === 0) {
+          disconnect()
+        } else if (account) {
+          setAccount({ ...account, address: accounts[0] })
+        }
+      }
+
+      const handleChainChanged = (chainId: string) => {
+        if (account) {
+          setAccount({ ...account, chainId: parseInt(chainId, 16) })
+        }
+      }
+
+      window.ethereum.on("accountsChanged", handleAccountsChanged)
+      window.ethereum.on("chainChanged", handleChainChanged)
+
+      return () => {
+        window.ethereum.removeListener("accountsChanged", handleAccountsChanged)
+        window.ethereum.removeListener("chainChanged", handleChainChanged)
+      }
+    }
+  }, [account])
+
+  return (
+    <WalletContext.Provider value={{ account, isConnecting, connect, disconnect }}>
+      {children}
+    </WalletContext.Provider>
+  )
+}
+
+export function useWallet() {
+  const context = useContext(WalletContext)
+  if (context === undefined) {
+    throw new Error("useWallet must be used within a WalletProvider")
+  }
+  return context
+}
+
+// Type declaration for window.ethereum
+declare global {
+  interface Window {
+    ethereum?: any
+  }
+}
